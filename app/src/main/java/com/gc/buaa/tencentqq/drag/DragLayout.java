@@ -1,6 +1,8 @@
 package com.gc.buaa.tencentqq.drag;
 
 import android.content.Context;
+import android.graphics.Color;
+import android.graphics.PorterDuff;
 import android.support.v4.view.ViewCompat;
 import android.support.v4.widget.ViewDragHelper;
 import android.util.AttributeSet;
@@ -8,6 +10,8 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.FrameLayout;
+
+import com.nineoldandroids.view.ViewHelper;
 
 /**
  * 侧滑面板
@@ -122,7 +126,7 @@ public class DragLayout extends FrameLayout {
             return super.clampViewPositionVertical(child, top, dy);
         }
 
-        //3,当View位置改变的时候调用（更新状态，伴随动画，重绘界面）
+        //3,当View位置改变的时候调用（更新状态，伴随动画，重绘界面），此时发生了真正的移动
         /**
          * 当位置改变时绘制
          * 此时发生了真正的移动
@@ -148,6 +152,9 @@ public class DragLayout extends FrameLayout {
 
                 mMainContent.layout(newLeft,0,mWidth + dx ,mHeight);
             }
+
+            //更新状态执行动画
+            dispatchDragEvent(newLeft);
 
             //为了兼容android低版本，每次修改值之后，进行重绘
             invalidate();
@@ -179,6 +186,78 @@ public class DragLayout extends FrameLayout {
         }
 
     };
+
+    /**
+     * 执行动画
+     * @param newLeft
+     */
+    private void dispatchDragEvent(int newLeft) {
+        float parcent = newLeft * 1.0f / mRange;
+
+        //左界面动画：缩放动画，平移动画，透明度动画
+
+            //缩放动画（0.5f~1.0f）
+            //mLeftContent.setScaleX(0.5f + 0.5f * parcent);
+            //mLeftContent.setScaleY(0.5f + 0.5f * parcent);
+            //使用nineoldandroids-2.4.0.jar兼容低版本
+            ViewHelper.setScaleX(mLeftContent, evaluate(parcent, 0.5f, 1.0f));
+            ViewHelper.setScaleY(mLeftContent, evaluate(parcent, 0.5f, 1.0f));
+
+            //平移动画(-mWidth/2.0f~0)
+            ViewHelper.setTranslationX(mLeftContent, evaluate(parcent, -mWidth / 2.0f ,0));
+
+            //透明度动画(0.5f~1.0f)
+            ViewHelper.setAlpha(mLeftContent, evaluate(parcent, 0.5f, 1.0f));
+
+        //主界面动画：缩放动画
+
+            //缩放动画
+            ViewHelper.setScaleX(mMainContent,evaluate(parcent, 1.0f, 0.8f));
+            ViewHelper.setScaleY(mMainContent, evaluate(parcent, 1.0f, 0.8f));
+
+        //背景动画：颜色亮度渐变
+
+            //颜色亮度渐变
+            getBackground().setColorFilter((Integer) evaluateColor(parcent, Color.BLACK, Color.TRANSPARENT), PorterDuff.Mode.SRC_OVER);
+    }
+
+    /**
+     * 颜色变化过度
+     * @param fraction
+     * @param startValue
+     * @param endValue
+     * @return
+     */
+    public Object evaluateColor(float fraction, Object startValue, Object endValue) {
+        int startInt = (Integer) startValue;
+        int startA = (startInt >> 24) & 0xff;
+        int startR = (startInt >> 16) & 0xff;
+        int startG = (startInt >> 8) & 0xff;
+        int startB = startInt & 0xff;
+
+        int endInt = (Integer) endValue;
+        int endA = (endInt >> 24) & 0xff;
+        int endR = (endInt >> 16) & 0xff;
+        int endG = (endInt >> 8) & 0xff;
+        int endB = endInt & 0xff;
+
+        return (int)((startA + (int)(fraction * (endA - startA))) << 24) |
+                (int)((startR + (int)(fraction * (endR - startR))) << 16) |
+                (int)((startG + (int)(fraction * (endG - startG))) << 8) |
+                (int)((startB + (int)(fraction * (endB - startB))));
+    }
+
+    /**
+     * 计算阶段值(估值器)
+     * @param fraction 阶段百分比
+     * @param startValue 开始值
+     * @param endValue 结尾值
+     * @return
+     */
+    public Float evaluate(float fraction, Number startValue, Number endValue){
+        float startFloat = startValue.floatValue();
+        return startFloat + fraction * (endValue.floatValue() - startFloat);
+    }
 
     @Override
     public void computeScroll() {
