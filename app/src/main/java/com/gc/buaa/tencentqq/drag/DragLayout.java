@@ -26,6 +26,33 @@ public class DragLayout extends FrameLayout {
     private int mWidth;
     //移动的范围
     private int mRange;
+    private Status mStatus = Status.Close;
+    private OnDragStatusChangeListener mListener;
+
+    /**
+     * 状态枚举
+     */
+    public static enum Status {
+        Close, Open, Draging;
+    }
+
+    public interface OnDragStatusChangeListener{
+        void onClose();
+        void onOpen();
+        void onDraging(float percent);
+    }
+
+    public Status getStatus() {
+        return mStatus;
+    }
+
+    public void setStatus(Status mStatus) {
+        this.mStatus = mStatus;
+    }
+
+    public void setDragStatusListener(OnDragStatusChangeListener mListener){
+        this.mListener = mListener;
+    }
 
     public DragLayout(Context context) {
         this(context,null);
@@ -188,37 +215,82 @@ public class DragLayout extends FrameLayout {
     };
 
     /**
-     * 执行动画
+     * 执行动画，更新状态
      * @param newLeft
      */
     private void dispatchDragEvent(int newLeft) {
-        float parcent = newLeft * 1.0f / mRange;
+        float percent = newLeft * 1.0f / mRange;
 
+        // 更新状态, 执行接口回调
+        if(mListener != null){
+            mListener.onDraging(percent);
+        }
+        Status preStatus = mStatus;
+        mStatus = updateStatus(percent);
+        if(mStatus != preStatus){
+            // 状态发生变化
+            if(mStatus == Status.Close){
+                // 当前变为关闭状态
+                if(mListener != null){
+                    mListener.onClose();
+                }
+            }else if (mStatus == Status.Open) {
+                if(mListener != null){
+                    mListener.onOpen();
+                }
+            }
+        }
+
+
+        //伴随动画
+        animViews(percent);
+    }
+
+    /**
+     * 更新状态
+     * @param percent 拖拽进度（百分比）
+     * @return 新状态
+     */
+    private Status updateStatus(float percent) {
+        if(percent == 0f){
+            return Status.Close;
+        }else if (percent == 1.0f) {
+            return Status.Open;
+        }
+        return Status.Draging;
+    }
+
+    /**
+     * 伴随动画
+     * @param parcent 动画进度（百分比）
+     */
+    private void animViews(float parcent) {
         //左界面动画：缩放动画，平移动画，透明度动画
 
-            //缩放动画（0.5f~1.0f）
-            //mLeftContent.setScaleX(0.5f + 0.5f * parcent);
-            //mLeftContent.setScaleY(0.5f + 0.5f * parcent);
-            //使用nineoldandroids-2.4.0.jar兼容低版本
-            ViewHelper.setScaleX(mLeftContent, evaluate(parcent, 0.5f, 1.0f));
-            ViewHelper.setScaleY(mLeftContent, evaluate(parcent, 0.5f, 1.0f));
+        //缩放动画（0.5f~1.0f）
+        //mLeftContent.setScaleX(0.5f + 0.5f * parcent);
+        //mLeftContent.setScaleY(0.5f + 0.5f * parcent);
+        //使用nineoldandroids-2.4.0.jar兼容低版本
+        ViewHelper.setScaleX(mLeftContent, evaluate(parcent, 0.5f, 1.0f));
+        ViewHelper.setScaleY(mLeftContent, evaluate(parcent, 0.5f, 1.0f));
 
-            //平移动画(-mWidth/2.0f~0)
-            ViewHelper.setTranslationX(mLeftContent, evaluate(parcent, -mWidth / 2.0f ,0));
+        //平移动画(-mWidth/2.0f~0)
+        ViewHelper.setTranslationX(mLeftContent, evaluate(parcent, -mWidth / 2.0f ,0));
 
-            //透明度动画(0.5f~1.0f)
-            ViewHelper.setAlpha(mLeftContent, evaluate(parcent, 0.5f, 1.0f));
+        //透明度动画(0.5f~1.0f)
+        ViewHelper.setAlpha(mLeftContent, evaluate(parcent, 0.5f, 1.0f));
 
         //主界面动画：缩放动画
 
-            //缩放动画
-            ViewHelper.setScaleX(mMainContent,evaluate(parcent, 1.0f, 0.8f));
-            ViewHelper.setScaleY(mMainContent, evaluate(parcent, 1.0f, 0.8f));
+        //缩放动画
+        ViewHelper.setScaleX(mMainContent,evaluate(parcent, 1.0f, 0.8f));
+        ViewHelper.setScaleY(mMainContent, evaluate(parcent, 1.0f, 0.8f));
 
         //背景动画：颜色亮度渐变
 
-            //颜色亮度渐变
-            getBackground().setColorFilter((Integer) evaluateColor(parcent, Color.BLACK, Color.TRANSPARENT), PorterDuff.Mode.SRC_OVER);
+        //颜色亮度渐变
+        getBackground().setColorFilter((Integer) evaluateColor(parcent, Color.BLACK, Color.TRANSPARENT), PorterDuff.Mode.SRC_OVER);
+
     }
 
     /**
